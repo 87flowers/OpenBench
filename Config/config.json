@@ -1,11 +1,15 @@
 {
     "client_version"     : 39,
-    "client_repo_url"    : "https://github.com/AndyGrant/OpenBench",
-    "client_repo_ref"    : "master",
+    "client_repo_url"    : "https://github.com/87flowers/OpenBench",
+    "client_repo_ref"    : "shogi",
 
     "fastchess_min_version" : "0.9.0",
     "fastchess_repo_url"    : "https://github.com/AndyGrant/fast-chess",
     "fastchess_repo_ref"    : "master",
+
+    "shogitest_min_version" : "0.1.0",
+    "shogitest_repo_url"    : "https://github.com/87flowers/shogitest",
+    "shogitest_repo_ref"    : "main",
 
     "use_cross_approval"          : false,
     "require_login_to_view"       : false,
@@ -13,6 +17,8 @@
     "balance_engine_throughputs"  : false,
 
     "books" : [
+        "4moves_v1_shogi_sfen.epd",
+        "6moves_v1_shogi_sfen.epd",
         "2moves_v1.epd",
         "3moves_FRC.epd",
         "4moves_noob.epd",
