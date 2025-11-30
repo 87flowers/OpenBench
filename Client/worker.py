@@ -96,7 +96,7 @@ class Configuration:
         self.blacklist      = []
 
         self.process_args(args)   # Rest of the command line settings
-        self.check_requirements() # Checks for Make, and g++ or clang++
+        self.check_requirements() # Checks for Make, cargo, and g++ or clang++
         self.init_client()        # Create folder structure and verify Syzygy
         self.validate_setup()     # Check the threads and sockets values provided
 
@@ -129,6 +129,9 @@ class Configuration:
         if not self.cxx_comp:
             print ('[Error] Unable to locate C++ Compiler (g++ or clang++)')
             sys.exit()
+
+        # Verify that we have cargo installed (for building shogitest)
+        print('\nLooking for Cargo... [v%s]' % locate_utility('cargo'))
 
     def init_client(self):
 
@@ -397,8 +400,16 @@ class MatchRunner:
     ## and a small number of secondary arguments that are not housed in the Configuration
 
     @staticmethod
+    def is_shogi(config):
+        book_name = config.workload['test']['book']['name'].upper()
+        return 'SHOGI' in book_name
+
+    @staticmethod
     def executable(config):
-        return ['fastchess-ob.exe', './fastchess-ob'][IS_LINUX]
+        if MatchRunner.is_shogi(config):
+            return ['shogitest-ob.exe', './shogitest-ob'][IS_LINUX]
+        else:
+            return ['fastchess-ob.exe', './fastchess-ob'][IS_LINUX]
 
     @staticmethod
     def basic_settings(config):
@@ -482,6 +493,7 @@ class MatchRunner:
 
         # Human-readable name, and scale the time control
         name    = command.replace('.exe', '')
+        proto   = ["uci", "usi"][MatchRunner.is_shogi(config)]
         control = scale_time_control(config.workload, scale_factor, branch)
 
         # Private engines, when using Networks, must set them via UCI
@@ -504,7 +516,7 @@ class MatchRunner:
 
         # Join options together in format expected by match runner
         options = ' option.'.join([''] + re.findall(r'"[^"]*"|\S+', options))
-        return '-engine dir=Engines/ cmd=./%s proto=uci %s%s name=%s-%s' % (command, control, options, engine, branch)
+        return '-engine dir=Engines/ cmd=./%s proto=%s %s%s name=%s-%s' % (command, proto, control, options, engine, branch)
 
     @staticmethod
     def pgnout_settings(config, timestamp, runner_idx):
@@ -565,9 +577,11 @@ class MatchRunner:
 
         if IS_LINUX:
             utils.kill_process_by_name('fastchess-ob')
+            utils.kill_process_by_name('shogitest-ob')
 
         if IS_WINDOWS:
             utils.kill_process_by_name('fastchess-ob.exe')
+            utils.kill_process_by_name('shogitest-ob.exe')
 
         utils.kill_process_by_name(dev_process)
         utils.kill_process_by_name(base_process)
@@ -763,12 +777,16 @@ def locate_utility(util, force_exit=True, report_error=True):
 def set_runner_permissions():
 
     status = os.system('sudo -n chmod 777 fastchess-ob > /dev/null 2>&1')
-
     if status != 0:
         status = os.system('chmod 777 fastchess-ob > /dev/null 2>&1')
-
     if status != 0:
         print ('[ERROR] Unable to set execute permissions on fastchess-ob')
+
+    status = os.system('sudo -n chmod 777 shogitest-ob > /dev/null 2>&1')
+    if status != 0:
+        status = os.system('chmod 777 shogitest-ob > /dev/null 2>&1')
+    if status != 0:
+        print ('[ERROR] Unable to set execute permissions on shogitest-ob')
 
 
 def cleanup_client():
@@ -921,6 +939,9 @@ def determine_scale_factor(config, dev_name, dev_network, base_name, base_networ
 def server_configure_fastchess(config):
     server_configure_match_runner(config, 'fastchess', build_fastchess_in_dir)
 
+def server_configure_shogitest(config):
+    server_configure_match_runner(config, 'shogitest', build_shogitest_in_dir)
+
 def server_configure_match_runner(config, name, build_func):
 
     # OpenBench Server holds the runner repo and git-ref
@@ -993,6 +1014,18 @@ def build_fastchess_in_dir(config, runner_dir):
             print ('> %s' % (line))
         raise OpenBenchMatchRunnerBuildFailedException()
 
+def build_shogitest_in_dir(config, runner_dir):
+    make_cmd    = ['make', 'openbench']
+    process     = subprocess.Popen(make_cmd, cwd=runner_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    comp_output = process.communicate()[0].decode('utf-8')
+
+    # Make threw an error, and thus failed to build
+    if process.returncode:
+        print ('\nFailed to build shogitest\n\nCompiler Output:')
+        for line in comp_output.split('\n'):
+            print ('> %s' % (line))
+        raise OpenBenchMatchRunnerBuildFailedException()
+
 def server_configure_worker(config):
 
     # Server tells us how to build or obtain binaries
@@ -1025,6 +1058,7 @@ def server_configure_worker(config):
         'focus'          : config.focus,          # List of engines we have a preference to help
         'cxx_comp'       : config.cxx_comp,       # C++ Compiler used to build Fastchess binaries
         'fastchess_ver'  : config.fastchess_ver,  # Fastchess Version, set during server_configure_fastchess()
+        'shogitest_ver'  : config.shogitest_ver,  # Shogitest Version, set during server_configure_shogitest()
         'client_ver'     : CLIENT_VERSION,        # Version of the Client, which the server may reject
     }
 
@@ -1363,6 +1397,7 @@ def run_openbench_worker(client_args):
     reload_local_imports()
 
     fastchess_error  = '[Note] Unable to locate and/or build desired Fastchess version!'
+    shogitest_error  = '[Note] Unable to locate and/or build desired Shogitest version!'
     setup_error      = '[Note] Unable to establish initial connection with the Server!'
     connection_error = '[Note] Unable to reach the server to request a workload!'
 
@@ -1370,6 +1405,7 @@ def run_openbench_worker(client_args):
     config = Configuration(args)          # Holds System info, args, and Workload info
 
     try_forever(server_configure_fastchess, [config], fastchess_error)
+    try_forever(server_configure_shogitest, [config], shogitest_error)
     try_forever(server_configure_worker, [config], setup_error)
 
     if IS_LINUX:

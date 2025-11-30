@@ -107,6 +107,8 @@ def verify_general_config(conf):
     assert type(conf.get('fastchess_min_version') == str)
     assert type(conf.get('fastchess_repo_url') == str)
     assert type(conf.get('fastchess_repo_ref') == str)
+    assert type(conf.get('shogitest_repo_url') == str)
+    assert type(conf.get('shogitest_repo_ref') == str)
 
     assert type(conf.get('use_cross_approval'         ) == bool)
     assert type(conf.get('require_login_to_view'      ) == bool)
