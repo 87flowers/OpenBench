@@ -26,6 +26,7 @@ import requests
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
 
 ## Local imports must only use "import x", never "from x import ..."
@@ -91,15 +92,23 @@ class OpenBenchMatchRunnerBuildFailedException(Exception):
         self.message = ''
         super().__init__(self.message)
 
-def kill_process_by_name(process_name):
-
-    process_name = os.path.basename(process_name)
-
-    if IS_LINUX:
-        subprocess.run(['pkill', '-f', process_name])
+def kill_processes_by_name(process_names):
 
     if IS_WINDOWS:
-        subprocess.run(['taskkill', '/f', '/im', process_name])
+        for process_name in process_names:
+            process_name = os.path.basename(process_name)
+            subprocess.run(['taskkill', '/f', '/im', process_name])
+
+    if IS_LINUX:
+        for process_name in process_names:
+            process_name = os.path.basename(process_name)
+            subprocess.run(['pkill', '-TERM', '-f', process_name])
+
+        time.sleep(3)
+
+        for process_name in process_names:
+            process_name = os.path.basename(process_name)
+            subprocess.run(['pkill', '-KILL', '-f', process_name])
 
 def url_join(*args, trailing_slash=True):
 

@@ -565,15 +565,11 @@ class MatchRunner:
 
     @staticmethod
     def kill_everything(dev_process, base_process):
-
         if IS_LINUX:
-            utils.kill_process_by_name('fastchess-ob')
+            utils.kill_processes_by_name(['fastchess-ob', dev_process, base_process])
 
         if IS_WINDOWS:
-            utils.kill_process_by_name('fastchess-ob.exe')
-
-        utils.kill_process_by_name(dev_process)
-        utils.kill_process_by_name(base_process)
+            utils.kill_processes_by_name(['fastchess-ob.exe', dev_process, base_process])
 
     @staticmethod
     def pgn_name(config, timestamp, runner_idx):
